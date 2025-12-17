@@ -32,7 +32,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Type check
+      - name: Run tests
+        run: pnpm test
+
+      - name: Type check & build
         run: pnpm build
 
       - name: Verify binary
