@@ -9,16 +9,22 @@ interface EditorProps {
   cursorCol: number;
   scrollOffset: number;
   mode: AppMode;
+  reservedLines?: number;  // Lines reserved for UI below editor
 }
 
-export function Editor({ lines, cursorLine, cursorCol, scrollOffset, mode }: EditorProps) {
+export function Editor({ 
+  lines, 
+  cursorLine, 
+  cursorCol, 
+  scrollOffset, 
+  mode,
+  reservedLines = 4 
+}: EditorProps) {
   const { stdout } = useStdout();
   const terminalHeight = stdout?.rows ?? 24;
   
-  // Reserve lines for status bar (2) and some padding
-  const editorHeight = Math.max(terminalHeight - 4, 10);
-  
   // Calculate visible lines
+  const editorHeight = Math.max(terminalHeight - reservedLines, 10);
   const visibleLines = lines.slice(scrollOffset, scrollOffset + editorHeight);
   
   return (

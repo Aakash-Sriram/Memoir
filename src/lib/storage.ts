@@ -5,7 +5,7 @@ import os from 'os';
 import { Note, DEFAULT_TEMPLATE } from '../types.js';
 
 // Notes directory - stored in user's home folder
-const NOTES_DIR = path.join(os.homedir(), '.labbook', 'notes');
+const NOTES_DIR = path.join(os.homedir(), '.memoir', 'notes');
 
 // Ensure the notes directory exists
 export function ensureNotesDir(): void {

@@ -1,28 +1,21 @@
 #!/usr/bin/env node
-// labbook - Minimal TUI Notes App for Experiments & Thinking
+// Memoir - Minimal TUI Notes App for Experiments & Thinking
 // 
-// Usage: labbook [date]
+// Usage: mem [date]
 //   - No arguments: Opens today's note
 //   - With date: Opens note for that date (YYYY-MM-DD format)
 //
-// Keybindings:
-//   Normal mode:
-//     i       - Enter insert mode
-//     /       - Search all notes
-//     h/l     - Navigate to previous/next day
-//     t       - Go to today
-//     g       - Go to specific date
-//     j/k     - Move cursor down/up
-//     w       - Save note
-//     q       - Quit (auto-saves)
+// Two Modes:
+//   NORMAL - Navigate, issue commands, read
+//   INSERT - Write and edit text
 //
-//   Insert mode:
-//     Esc     - Return to normal mode
-//     Ctrl+S  - Save note
-//
-//   Search mode:
-//     Enter   - Execute search
-//     Esc     - Cancel
+// Commands (from Normal mode, prefix with :):
+//   :next / :n      - Go to next day
+//   :prev / :p      - Go to previous day
+//   :today / :t     - Go to today
+//   :search <query> - Search all notes
+//   :write / :w     - Save note
+//   :quit / :q      - Quit (auto-saves)
 //
 import React from 'react';
 import { render } from 'ink';
@@ -38,13 +31,13 @@ const args = process.argv.slice(2);
 
 if (args.includes('--help') || args.includes('-h')) {
   console.log(`
-labbook - Minimal TUI Notes App
+Memoir - Minimal TUI Notes App
 
 Usage:
-  labbook            Open today's note
-  labbook YYYY-MM-DD Open note for specific date
-  labbook --dir      Show notes directory path
-  labbook --help     Show this help
+  mem            Open today's note
+  mem YYYY-MM-DD Open note for specific date
+  mem --dir      Show notes directory path
+  mem --help     Show this help
 
 Notes are stored in: ${getNotesDir()}
 `);

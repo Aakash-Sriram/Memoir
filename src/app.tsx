@@ -1,10 +1,16 @@
 // Labbook - Minimal TUI Notes App
-import React, { useState, useCallback, useEffect } from 'react';
+//
+// Design contract:
+// - Only two modes: Normal and Insert
+// - Commands via : prefix (not modes)
+// - Views may change (editor, results), modes do not
+
+import React, { useState, useCallback } from 'react';
 import { Box, Text, useApp, useStdout } from 'ink';
-import TextInput from 'ink-text-input';
-import { AppMode, AppState, EditorState, DEFAULT_TEMPLATE } from './types.js';
-import { loadNote, saveNote, searchNotes, SearchMatch } from './lib/storage.js';
-import { getToday, getYesterday, getTomorrow, parseDate, formatDateDisplay } from './lib/dates.js';
+import { AppState, ViewType } from './types.js';
+import { loadNote, saveNote, searchNotes } from './lib/storage.js';
+import { getToday, getYesterday, getTomorrow, parseDate } from './lib/dates.js';
+import { parseCommand, executeCommand } from './lib/commands.js';
 import { StatusBar } from './components/StatusBar.js';
 import { Editor } from './components/Editor.js';
 import { SearchResults } from './components/SearchResults.js';
@@ -17,6 +23,7 @@ function initState(date: string): AppState {
   
   return {
     mode: 'normal',
+    view: 'editor',
     currentDate: date,
     note,
     editor: {
@@ -25,10 +32,14 @@ function initState(date: string): AppState {
       scrollOffset: 0,
       lines
     },
+    command: {
+      active: false,
+      input: '',
+      hint: undefined
+    },
     searchQuery: '',
     searchResults: [],
     selectedResultIndex: 0,
-    gotoInput: '',
     message: '',
     dirty: false
   };
@@ -40,19 +51,145 @@ export default function App() {
   const [state, setState] = useState<AppState>(() => initState(getToday()));
   
   const terminalHeight = stdout?.rows ?? 24;
-  const editorHeight = Math.max(terminalHeight - 4, 10);
+  const editorHeight = Math.max(terminalHeight - 5, 10);
+  
+  // Save current note
+  const saveCurrentNote = useCallback(() => {
+    const content = state.editor.lines.join('\n');
+    saveNote({ ...state.note, content, exists: true });
+    setState(prev => ({ 
+      ...prev, 
+      dirty: false, 
+      note: { ...prev.note, content, exists: true },
+      message: 'Saved!' 
+    }));
+    setTimeout(() => setState(prev => ({ ...prev, message: '' })), 2000);
+  }, [state.editor.lines, state.note]);
   
   // Navigate to a different date
-  const navigateToDate = useCallback((date: string) => {
-    // Save current note if dirty
+  const navigateToDate = useCallback((dateInput: string) => {
+    let targetDate: string | null = null;
+    
+    switch (dateInput.toLowerCase()) {
+      case 'next':
+      case 'tomorrow':
+        targetDate = getTomorrow(state.currentDate);
+        break;
+      case 'prev':
+      case 'previous':
+      case 'yesterday':
+        targetDate = getYesterday(state.currentDate);
+        break;
+      case 'today':
+        targetDate = getToday();
+        break;
+      default:
+        targetDate = parseDate(dateInput);
+    }
+    
+    if (!targetDate) {
+      setState(prev => ({ ...prev, message: `Invalid date: ${dateInput}` }));
+      setTimeout(() => setState(prev => ({ ...prev, message: '' })), 3000);
+      return;
+    }
+    
     if (state.dirty) {
       const content = state.editor.lines.join('\n');
       saveNote({ ...state.note, content });
     }
-    setState(initState(date));
-  }, [state.dirty, state.editor.lines, state.note]);
+    
+    setState(initState(targetDate));
+  }, [state.currentDate, state.dirty, state.editor.lines, state.note]);
   
-  // Update cursor ensuring it stays in bounds
+  // Jump to heading in current note
+  const gotoHeading = useCallback((heading: string) => {
+    const lowerHeading = heading.toLowerCase();
+    const lineIndex = state.editor.lines.findIndex(line => {
+      const lowerLine = line.toLowerCase();
+      return lowerLine.startsWith('#') && lowerLine.includes(lowerHeading);
+    });
+    
+    if (lineIndex !== -1) {
+      setState(prev => ({
+        ...prev,
+        editor: {
+          ...prev.editor,
+          cursorLine: lineIndex,
+          cursorCol: 0,
+          scrollOffset: Math.max(0, lineIndex - 3)
+        },
+        message: ''
+      }));
+    } else {
+      setState(prev => ({ ...prev, message: `Heading not found: ${heading}` }));
+      setTimeout(() => setState(prev => ({ ...prev, message: '' })), 3000);
+    }
+  }, [state.editor.lines]);
+  
+  // Execute a command string
+  const runCommand = useCallback((input: string) => {
+    const parsed = parseCommand(input);
+    const result = executeCommand(parsed);
+    
+    switch (result.type) {
+      case 'navigation':
+        navigateToDate(result.date);
+        break;
+        
+      case 'goto':
+        gotoHeading(result.heading);
+        break;
+        
+      case 'search': {
+        const results = searchNotes(result.query);
+        setState(prev => ({
+          ...prev,
+          view: 'results',
+          searchQuery: result.query,
+          searchResults: results,
+          selectedResultIndex: 0,
+          command: { active: false, input: '', hint: 'search' }
+        }));
+        break;
+      }
+        
+      case 'save':
+        saveCurrentNote();
+        if (parsed.name === 'wq') {
+          setTimeout(() => exit(), 100);
+        }
+        break;
+        
+      case 'quit':
+        if (state.dirty) {
+          saveCurrentNote();
+        }
+        exit();
+        break;
+        
+      case 'help':
+        setState(prev => ({
+          ...prev,
+          message: ':next :prev :today :open <date> :goto <heading> :search <query> :write :quit'
+        }));
+        setTimeout(() => setState(prev => ({ ...prev, message: '' })), 5000);
+        break;
+        
+      case 'error':
+        setState(prev => ({ ...prev, message: result.message }));
+        setTimeout(() => setState(prev => ({ ...prev, message: '' })), 3000);
+        break;
+        
+      case 'success':
+        break;
+    }
+    
+    if (result.type !== 'search') {
+      setState(prev => ({ ...prev, command: { active: false, input: '', hint: undefined } }));
+    }
+  }, [navigateToDate, gotoHeading, saveCurrentNote, state.dirty, exit]);
+  
+  // Update cursor
   const updateCursor = useCallback((line: number, col: number) => {
     setState(prev => {
       const maxLine = prev.editor.lines.length - 1;
@@ -61,7 +198,6 @@ export default function App() {
       const maxCol = Math.max(0, lineContent.length - (prev.mode === 'normal' ? 1 : 0));
       const newCol = Math.max(0, Math.min(col, maxCol));
       
-      // Adjust scroll to keep cursor visible
       let newScroll = prev.editor.scrollOffset;
       if (newLine < newScroll) {
         newScroll = newLine;
@@ -83,13 +219,21 @@ export default function App() {
   
   // Keyboard handlers
   const handlers = {
-    // Navigation
-    onNavigateUp: () => updateCursor(state.editor.cursorLine - 1, state.editor.cursorCol),
-    onNavigateDown: () => {
-      if (state.mode === 'results') {
+    onNavigateUp: () => {
+      if (state.view === 'results') {
         setState(prev => ({
           ...prev,
-          selectedResultIndex: Math.min(prev.selectedResultIndex + 1, prev.searchResults.length - 1)
+          selectedResultIndex: Math.max(0, prev.selectedResultIndex - 1)
+        }));
+      } else {
+        updateCursor(state.editor.cursorLine - 1, state.editor.cursorCol);
+      }
+    },
+    onNavigateDown: () => {
+      if (state.view === 'results') {
+        setState(prev => ({
+          ...prev,
+          selectedResultIndex: Math.min(prev.searchResults.length - 1, prev.selectedResultIndex + 1)
         }));
       } else {
         updateCursor(state.editor.cursorLine + 1, state.editor.cursorCol);
@@ -102,9 +246,8 @@ export default function App() {
     onNavigateFileStart: () => updateCursor(0, 0),
     onNavigateFileEnd: () => updateCursor(Infinity, 0),
     
-    // Mode switching
     onEnterInsertMode: () => setState(prev => ({ ...prev, mode: 'insert', message: '' })),
-    onEnterInsertModeEnd: () => {
+    onEnterInsertModeAppend: () => {
       updateCursor(state.editor.cursorLine, state.editor.cursorCol + 1);
       setState(prev => ({ ...prev, mode: 'insert', message: '' }));
     },
@@ -126,160 +269,41 @@ export default function App() {
         };
       });
     },
-    onEnterSearchMode: () => setState(prev => ({ 
+    onExitInsertMode: () => setState(prev => ({ ...prev, mode: 'normal' })),
+    
+    onStartCommand: () => setState(prev => ({ 
       ...prev, 
-      mode: 'search', 
-      searchQuery: '',
-      searchResults: [],
-      message: '' 
+      command: { active: true, input: '', hint: undefined } 
     })),
-    onEnterGotoMode: () => setState(prev => ({ 
+    onCommandInput: (char: string) => setState(prev => ({
+      ...prev,
+      command: { ...prev.command, input: prev.command.input + char }
+    })),
+    onCommandBackspace: () => setState(prev => ({
+      ...prev,
+      command: { ...prev.command, input: prev.command.input.slice(0, -1) }
+    })),
+    onExecuteCommand: () => runCommand(state.command.input),
+    onCancelCommand: () => setState(prev => ({ 
       ...prev, 
-      mode: 'goto', 
-      gotoInput: '',
-      message: '' 
+      command: { active: false, input: '', hint: undefined } 
     })),
-    onExitMode: () => {
-      if (state.mode === 'results') {
-        setState(prev => ({ ...prev, mode: 'search' }));
-      } else {
-        setState(prev => ({ ...prev, mode: 'normal', message: '' }));
-      }
-    },
-    
-    // Date navigation
-    onPrevDay: () => navigateToDate(getYesterday(state.currentDate)),
-    onNextDay: () => navigateToDate(getTomorrow(state.currentDate)),
-    onGoToToday: () => navigateToDate(getToday()),
-    
-    // Actions
-    onSave: () => {
-      const content = state.editor.lines.join('\n');
-      saveNote({ ...state.note, content, exists: true });
-      setState(prev => ({ 
-        ...prev, 
-        dirty: false, 
-        note: { ...prev.note, content, exists: true },
-        message: 'Saved!' 
-      }));
-      setTimeout(() => setState(prev => ({ ...prev, message: '' })), 2000);
-    },
-    
-    onQuit: () => {
-      if (state.dirty) {
-        const content = state.editor.lines.join('\n');
-        saveNote({ ...state.note, content });
-      }
-      exit();
-    },
-    
-    onExecuteSearch: () => {
-      if (state.searchQuery.trim()) {
-        const results = searchNotes(state.searchQuery);
-        setState(prev => ({
-          ...prev,
-          mode: 'results',
-          searchResults: results,
-          selectedResultIndex: 0
-        }));
-      }
-    },
     
     onSelectResult: () => {
-      if (state.mode === 'results' && state.searchResults.length > 0) {
+      if (state.searchResults.length > 0) {
         const result = state.searchResults[state.selectedResultIndex];
         navigateToDate(result.date);
-        setTimeout(() => updateCursor(result.line - 1, 0), 50);
-      } else if (state.mode === 'goto') {
-        const parsed = parseDate(state.gotoInput);
-        if (parsed) {
-          navigateToDate(parsed);
-        } else {
-          setState(prev => ({ ...prev, mode: 'normal', message: 'Invalid date format' }));
-        }
+        setTimeout(() => {
+          updateCursor(result.line - 1, 0);
+          setState(prev => ({ ...prev, view: 'editor', command: { active: false, input: '', hint: undefined } }));
+        }, 50);
       }
     },
-    
-    onDeleteChar: () => {
-      setState(prev => {
-        const lines = [...prev.editor.lines];
-        const line = lines[prev.editor.cursorLine];
-        if (line && prev.editor.cursorCol < line.length) {
-          lines[prev.editor.cursorLine] = 
-            line.slice(0, prev.editor.cursorCol) + line.slice(prev.editor.cursorCol + 1);
-          return {
-            ...prev,
-            dirty: true,
-            editor: { ...prev.editor, lines }
-          };
-        }
-        return prev;
-      });
-    },
-    
-    onDeleteCharBack: () => {
-      setState(prev => {
-        const lines = [...prev.editor.lines];
-        const { cursorLine, cursorCol } = prev.editor;
-        
-        if (cursorCol > 0) {
-          // Delete character before cursor
-          const line = lines[cursorLine];
-          lines[cursorLine] = line.slice(0, cursorCol - 1) + line.slice(cursorCol);
-          return {
-            ...prev,
-            dirty: true,
-            editor: {
-              ...prev.editor,
-              lines,
-              cursorCol: cursorCol - 1
-            }
-          };
-        } else if (cursorLine > 0) {
-          // Join with previous line
-          const prevLine = lines[cursorLine - 1];
-          const currentLine = lines[cursorLine];
-          lines[cursorLine - 1] = prevLine + currentLine;
-          lines.splice(cursorLine, 1);
-          return {
-            ...prev,
-            dirty: true,
-            editor: {
-              ...prev.editor,
-              lines,
-              cursorLine: cursorLine - 1,
-              cursorCol: prevLine.length
-            }
-          };
-        }
-        return prev;
-      });
-    },
-    
-    onNewLine: () => {
-      setState(prev => {
-        const lines = [...prev.editor.lines];
-        const { cursorLine, cursorCol } = prev.editor;
-        const line = lines[cursorLine];
-        
-        // Split line at cursor
-        const before = line.slice(0, cursorCol);
-        const after = line.slice(cursorCol);
-        lines[cursorLine] = before;
-        lines.splice(cursorLine + 1, 0, after);
-        
-        return {
-          ...prev,
-          dirty: true,
-          editor: {
-            ...prev.editor,
-            lines,
-            cursorLine: cursorLine + 1,
-            cursorCol: 0
-          }
-        };
-      });
-    },
+    onExitResults: () => setState(prev => ({ 
+      ...prev, 
+      view: 'editor',
+      command: { active: false, input: '', hint: undefined }
+    })),
     
     onTextInput: (char: string) => {
       setState(prev => {
@@ -300,108 +324,132 @@ export default function App() {
         };
       });
     },
-    
-    onSearchInput: (char: string) => {
-      if (char === '\b') {
-        setState(prev => ({
+    onDeleteCharBack: () => {
+      setState(prev => {
+        const lines = [...prev.editor.lines];
+        const { cursorLine, cursorCol } = prev.editor;
+        
+        if (cursorCol > 0) {
+          const line = lines[cursorLine];
+          lines[cursorLine] = line.slice(0, cursorCol - 1) + line.slice(cursorCol);
+          return {
+            ...prev,
+            dirty: true,
+            editor: {
+              ...prev.editor,
+              lines,
+              cursorCol: cursorCol - 1
+            }
+          };
+        } else if (cursorLine > 0) {
+          const prevLine = lines[cursorLine - 1];
+          const currentLine = lines[cursorLine];
+          lines[cursorLine - 1] = prevLine + currentLine;
+          lines.splice(cursorLine, 1);
+          return {
+            ...prev,
+            dirty: true,
+            editor: {
+              ...prev.editor,
+              lines,
+              cursorLine: cursorLine - 1,
+              cursorCol: prevLine.length
+            }
+          };
+        }
+        return prev;
+      });
+    },
+    onNewLine: () => {
+      setState(prev => {
+        const lines = [...prev.editor.lines];
+        const { cursorLine, cursorCol } = prev.editor;
+        const line = lines[cursorLine];
+        
+        const before = line.slice(0, cursorCol);
+        const after = line.slice(cursorCol);
+        lines[cursorLine] = before;
+        lines.splice(cursorLine + 1, 0, after);
+        
+        return {
           ...prev,
-          searchQuery: prev.searchQuery.slice(0, -1)
-        }));
-      } else {
-        setState(prev => ({
-          ...prev,
-          searchQuery: prev.searchQuery + char
-        }));
-      }
+          dirty: true,
+          editor: {
+            ...prev.editor,
+            lines,
+            cursorLine: cursorLine + 1,
+            cursorCol: 0
+          }
+        };
+      });
     },
     
-    onGotoInput: (char: string) => {
-      if (char === '\b') {
-        setState(prev => ({
-          ...prev,
-          gotoInput: prev.gotoInput.slice(0, -1)
-        }));
-      } else {
-        setState(prev => ({
-          ...prev,
-          gotoInput: prev.gotoInput + char
-        }));
+    onQuickSearch: () => setState(prev => ({ 
+      ...prev, 
+      command: { active: true, input: 'search ', hint: undefined } 
+    })),
+    onQuickPrev: () => navigateToDate('prev'),
+    onQuickNext: () => navigateToDate('next'),
+    onQuickSave: () => saveCurrentNote(),
+    onQuickQuit: () => {
+      if (state.dirty) {
+        saveCurrentNote();
       }
+      exit();
     }
   };
   
-  useKeyboard(state.mode, handlers);
+  useKeyboard({
+    mode: state.mode,
+    view: state.view,
+    commandActive: state.command.active
+  }, handlers);
   
-  // Render based on mode
-  const renderContent = () => {
-    if (state.mode === 'search') {
-      return (
-        <Box flexDirection="column" flexGrow={1}>
-          <Box marginBottom={1}>
-            <Text bold>Search: </Text>
-            <Text>{state.searchQuery}</Text>
-            <Text backgroundColor="white" color="black"> </Text>
-          </Box>
-          <Text dimColor>Type your search and press Enter</Text>
-        </Box>
-      );
-    }
-    
-    if (state.mode === 'results') {
-      return (
-        <SearchResults
-          query={state.searchQuery}
-          results={state.searchResults}
-          selectedIndex={state.selectedResultIndex}
-        />
-      );
-    }
-    
-    if (state.mode === 'goto') {
-      return (
-        <Box flexDirection="column" flexGrow={1}>
-          <Box marginBottom={1}>
-            <Text bold>Go to date: </Text>
-            <Text>{state.gotoInput}</Text>
-            <Text backgroundColor="white" color="black"> </Text>
-          </Box>
-          <Text dimColor>Format: YYYY-MM-DD (e.g., 2025-12-17)</Text>
-        </Box>
-      );
-    }
-    
-    return (
-      <Editor
-        lines={state.editor.lines}
-        cursorLine={state.editor.cursorLine}
-        cursorCol={state.editor.cursorCol}
-        scrollOffset={state.editor.scrollOffset}
-        mode={state.mode}
-      />
-    );
-  };
+  const reservedLines = state.command.active ? 5 : 4;
   
   return (
     <Box flexDirection="column" height={terminalHeight}>
-      {/* Header */}
       <Box marginBottom={1}>
         <Text bold color="cyan">labbook</Text>
         <Text dimColor> — your lab notebook</Text>
       </Box>
       
-      {/* Main content */}
       <Box flexDirection="column" flexGrow={1}>
-        {renderContent()}
+        {state.view === 'results' ? (
+          <SearchResults
+            query={state.searchQuery}
+            results={state.searchResults}
+            selectedIndex={state.selectedResultIndex}
+          />
+        ) : (
+          <Editor
+            lines={state.editor.lines}
+            cursorLine={state.editor.cursorLine}
+            cursorCol={state.editor.cursorCol}
+            scrollOffset={state.editor.scrollOffset}
+            mode={state.mode}
+            reservedLines={reservedLines}
+          />
+        )}
       </Box>
       
-      {/* Status bar */}
+      {state.command.active && (
+        <Box>
+          <Text bold>:</Text>
+          <Text>{state.command.input}</Text>
+          <Text backgroundColor="white" color="black"> </Text>
+        </Box>
+      )}
+      
       <StatusBar
         mode={state.mode}
+        view={state.view}
         date={state.currentDate}
         dirty={state.dirty}
         message={state.message}
         lineCount={state.editor.lines.length}
         cursorLine={state.editor.cursorLine + 1}
+        commandHint={state.command.hint}
       />
     </Box>
   );

@@ -1,4 +1,4 @@
-# labbook
+# Memoir
 
 A minimal terminal-first notes app for experiments & thinking.
 
@@ -14,78 +14,101 @@ A minimal terminal-first notes app for experiments & thinking.
 ## Quick Start
 
 ```bash
-# Install dependencies
 pnpm install
-
-# Run in development mode
 pnpm dev
-
-# Or build and run
-pnpm build
-pnpm start
 ```
 
-## Usage
+Launch the app → you're in today's note. That's it.
 
-Launch the app and you're immediately in today's note. That's it.
+## Two Modes Only
 
-### Keyboard Controls
+| Mode | Purpose |
+|------|---------|
+| **NORMAL** | Navigate, issue commands, read |
+| **INSERT** | Write and edit text |
 
-#### Normal Mode
+No other modes exist. Views may change (editor, search results), but the mode does not.
+
+## Commands
+
+Commands are human-readable, verb-first, invoked with `:` from Normal mode.
+
+### Navigation
+
+| Command | Alias | Action |
+|---------|-------|--------|
+| `:next` | `:n` | Go to next day |
+| `:prev` | `:p` | Go to previous day |
+| `:today` | `:t` | Go to today |
+| `:open <date>` | `:o` | Open specific date |
+| `:open yesterday` | | Natural language works |
+| `:open tomorrow` | | Natural language works |
+
+### In-Note Navigation
+
+| Command | Action |
+|---------|--------|
+| `:goto <heading>` | Jump to heading (e.g., `:goto Experiments`) |
+
+### Search
+
+| Command | Alias | Action |
+|---------|-------|--------|
+| `:search <query>` | `:s` | Full-text search all notes |
+
+### File Operations
+
+| Command | Alias | Action |
+|---------|-------|--------|
+| `:write` | `:w` | Save current note |
+| `:quit` | `:q` | Quit (auto-saves) |
+| `:wq` | | Save and quit |
+| `:help` | `:?` | Show available commands |
+
+## Quick Aliases (Optional Accelerators)
+
+For power users, these shortcuts exist but are **not required**:
+
 | Key | Action |
 |-----|--------|
-| `i` | Enter insert mode |
-| `a` | Enter insert mode after cursor |
-| `o` | Insert new line below and enter insert mode |
-| `/` | Search all notes |
-| `h` | Go to previous day |
-| `l` | Go to next day |
-| `t` | Go to today |
-| `g` | Go to specific date |
-| `j` / `↓` | Move cursor down |
-| `k` / `↑` | Move cursor up |
-| `0` | Go to start of line |
-| `$` | Go to end of line |
-| `G` | Go to end of file |
-| `w` | Save note |
-| `q` | Quit (auto-saves) |
+| `h` | Previous day (alias for `:prev`) |
+| `l` | Next day (alias for `:next`) |
+| `/` | Opens `:search ` prompt |
+| `i` | Enter Insert mode |
+| `Esc` | Return to Normal mode |
+| `Ctrl+S` | Save |
+| `Ctrl+C` | Quit |
 
-#### Insert Mode
+A beginner can use the app without ever touching single-letter commands.
+
+## Cursor Navigation (Normal Mode)
+
 | Key | Action |
 |-----|--------|
-| `Esc` | Return to normal mode |
-| `Ctrl+S` | Save note |
-| Arrow keys | Move cursor |
-
-#### Search Mode
-| Key | Action |
-|-----|--------|
-| `Enter` | Execute search |
-| `Esc` | Cancel |
-
-#### Results Mode
-| Key | Action |
-|-----|--------|
-| `j` / `k` | Navigate results |
-| `Enter` | Open selected result |
-| `Esc` | Back to search |
+| `j` / `↓` | Move down |
+| `k` / `↑` | Move up |
+| `←` / `→` | Move left/right |
+| `0` | Start of line |
+| `$` | End of line |
+| `g` | Start of file |
+| `G` | End of file |
 
 ## Data Storage
 
-Notes are stored as plain markdown files in `~/.labbook/notes/`:
+Notes are stored as plain markdown files:
 
 ```
-~/.labbook/notes/
+~/.memoir/notes/
 ├── 2025-12-15.md
 ├── 2025-12-16.md
 └── 2025-12-17.md
 ```
 
-Each day has exactly one file. No databases, no sync conflicts, no complexity.
+One file per day. No database. No complexity.
 
 ## Daily Note Template
 
-When you create a new day's note, it starts with:
+New notes start with:
 
 ```markdown
 # 2025-12-17
@@ -103,38 +126,28 @@ When you create a new day's note, it starts with:
 
 ```
 
-These sections are suggestions, not rules. Delete, reorder, or ignore them freely.
+These sections are suggestions. Delete, reorder, or ignore them freely.
 
-## Documenting Experiments
+## Design Principles
 
-The tool naturally supports documenting experiments:
-
-```markdown
-## Experiments
-
-EXP-003: Minimal Notes App
-Hypothesis:
-If I reduce friction in note-taking, I will write daily.
-
-Status:
-Building
-
-Outcome:
-TBD
-```
+- **Beginner-friendly first. Expert-efficient eventually.**
+- Readable commands are the default
+- Compact shortcuts are optional accelerators
+- Vim inspiration, not Vim cosplay
+- Views may change, modes do not
+- Clarity beats cleverness
 
 ## What This App Doesn't Have
 
-By design, labbook does NOT include:
+By design:
 
-- Tags
-- Folders
-- Dashboards
-- Graph views
-- Task management
-- Reminders
-- Sync
-- Accounts
+- ❌ Tags
+- ❌ Folders
+- ❌ Dashboards
+- ❌ Graph views
+- ❌ Task management
+- ❌ Sync
+- ❌ Configuration
 
 Any feature that increases setup, maintenance, or decision-making is a failure.
 

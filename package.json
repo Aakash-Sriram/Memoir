@@ -1,12 +1,12 @@
 {
-  "name": "labbook",
+  "name": "memoir",
   "version": "0.1.0",
   "type": "module",
   "private": true,
   "description": "Minimal TUI notes app for experiments & thinking",
   "bin": {
-    "labbook": "./dist/index.js",
-    "lb": "./dist/index.js"
+    "memoir": "./dist/index.js",
+    "mem": "./dist/index.js"
   },
   "scripts": {
     "dev": "node --loader ts-node/esm src/index.tsx",
