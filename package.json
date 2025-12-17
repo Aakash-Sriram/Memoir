@@ -1,19 +1,21 @@
 {
-  "name": "tui-app",
-  "version": "1.0.0",
+  "name": "labbook",
+  "version": "0.1.0",
   "type": "module",
   "private": true,
-  "description": "Ink TUI starter",
+  "description": "Minimal TUI notes app for experiments & thinking",
+  "bin": {
+    "labbook": "./dist/index.js",
+    "lb": "./dist/index.js"
+  },
   "scripts": {
     "dev": "node --loader ts-node/esm src/index.tsx",
     "build": "tsc",
     "start": "node dist/index.js"
   },
   "dependencies": {
-    "axios": "^1.13.2",
+    "date-fns": "^3.6.0",
     "ink": "^6.5.1",
-    "ink-select-input": "^6.2.0",
-    "ink-spinner": "^5.0.0",
     "ink-text-input": "^6.0.0",
     "react": "^19.2.3"
   },
