@@ -19,7 +19,11 @@ export type CommandResult =
   | { type: 'goto'; heading: string }
   | { type: 'quit' }
   | { type: 'save' }
-  | { type: 'help' };
+  | { type: 'help' }
+  | { type: 'copy' }
+  | { type: 'cut' }
+  | { type: 'paste' }
+  | { type: 'delete' };
 
 // Alias map: shorthand → canonical command
 const ALIASES: Record<string, string> = {
@@ -38,6 +42,13 @@ const ALIASES: Record<string, string> = {
   'g': 'goto',
   'h': 'help',
   '?': 'help',
+  
+  // Clipboard
+  'y': 'copy',    // yank in vim terminology
+  'yy': 'copy',
+  'd': 'delete',
+  'dd': 'delete',
+  'x': 'cut',
 };
 
 // Parse command string into structured form
@@ -108,6 +119,19 @@ export function executeCommand(cmd: ParsedCommand): CommandResult {
     case 'help':
       return { type: 'help' };
     
+    // Clipboard operations
+    case 'copy':
+      return { type: 'copy' };
+    
+    case 'cut':
+      return { type: 'cut' };
+    
+    case 'paste':
+      return { type: 'paste' };
+    
+    case 'delete':
+      return { type: 'delete' };
+    
     // Unknown command
     default:
       if (cmd.name) {
@@ -129,6 +153,10 @@ export function getCommandHelp(): string[] {
     ':write, :w         — Save current note',
     ':quit, :q          — Quit (auto-saves)',
     ':wq                — Save and quit',
+    ':copy, :y          — Copy current line',
+    ':cut, :x           — Cut current line',
+    ':paste             — Paste from clipboard',
+    ':delete, :d        — Delete current line',
     ':help, :?          — Show this help',
   ];
 }

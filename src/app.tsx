@@ -12,6 +12,7 @@ import { loadNote, saveNote, searchNotes } from './lib/storage.js';
 import { getToday, getYesterday, getTomorrow, parseDate } from './lib/dates.js';
 import { parseCommand, executeCommand } from './lib/commands.js';
 import { autocompleteCommand, getInitialAutocompleteState, createAutocompleteState, navigateAutocomplete, getSelectedCandidate, COMMANDS_WITH_ARGS } from './lib/autocomplete.js';
+import { copyToClipboard, pasteFromClipboard } from './lib/clipboard.js';
 import { StatusBar } from './components/StatusBar.js';
 import { Editor } from './components/Editor.js';
 import { SearchResults } from './components/SearchResults.js';
@@ -173,9 +174,99 @@ export default function App() {
       case 'help':
         setState(prev => ({
           ...prev,
-          message: ':next :prev :today :open <date> :goto <heading> :search <query> :write :quit'
+          message: ':next :prev :today :open <date> :goto <heading> :search <query> :write :quit :copy :cut :paste :delete'
         }));
         setTimeout(() => setState(prev => ({ ...prev, message: '' })), 5000);
+        break;
+      
+      case 'copy':
+        setState(prev => {
+          const line = prev.editor.lines[prev.editor.cursorLine] ?? '';
+          copyToClipboard(line);
+          return { ...prev, message: 'Copied line' };
+        });
+        setTimeout(() => setState(prev => ({ ...prev, message: '' })), 2000);
+        break;
+      
+      case 'cut':
+        setState(prev => {
+          const { cursorLine, lines } = prev.editor;
+          const line = lines[cursorLine] ?? '';
+          copyToClipboard(line);
+          
+          // Remove line
+          const newLines = lines.length === 1 
+            ? [''] 
+            : lines.filter((_, i) => i !== cursorLine);
+          const newCursorLine = Math.min(cursorLine, newLines.length - 1);
+          const newCursorCol = Math.min(prev.editor.cursorCol, (newLines[newCursorLine] ?? '').length);
+          
+          return {
+            ...prev,
+            dirty: true,
+            editor: {
+              ...prev.editor,
+              lines: newLines,
+              cursorLine: newCursorLine,
+              cursorCol: newCursorCol
+            },
+            message: 'Cut line'
+          };
+        });
+        setTimeout(() => setState(prev => ({ ...prev, message: '' })), 2000);
+        break;
+      
+      case 'delete':
+        setState(prev => {
+          const { cursorLine, lines } = prev.editor;
+          
+          // Remove line
+          const newLines = lines.length === 1 
+            ? [''] 
+            : lines.filter((_, i) => i !== cursorLine);
+          const newCursorLine = Math.min(cursorLine, newLines.length - 1);
+          const newCursorCol = Math.min(prev.editor.cursorCol, (newLines[newCursorLine] ?? '').length);
+          
+          return {
+            ...prev,
+            dirty: true,
+            editor: {
+              ...prev.editor,
+              lines: newLines,
+              cursorLine: newCursorLine,
+              cursorCol: newCursorCol
+            },
+            message: 'Deleted line'
+          };
+        });
+        setTimeout(() => setState(prev => ({ ...prev, message: '' })), 2000);
+        break;
+      
+      case 'paste':
+        setState(prev => {
+          const text = pasteFromClipboard();
+          if (!text) {
+            return { ...prev, message: 'Clipboard empty' };
+          }
+          
+          const { cursorLine, lines } = prev.editor;
+          const newLines = [...lines];
+          // Insert pasted line below current line
+          newLines.splice(cursorLine + 1, 0, text);
+          
+          return {
+            ...prev,
+            dirty: true,
+            editor: {
+              ...prev.editor,
+              lines: newLines,
+              cursorLine: cursorLine + 1,
+              cursorCol: 0
+            },
+            message: 'Pasted'
+          };
+        });
+        setTimeout(() => setState(prev => ({ ...prev, message: '' })), 2000);
         break;
         
       case 'error':

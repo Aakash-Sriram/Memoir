@@ -130,6 +130,50 @@ describe('executeCommand', () => {
     });
   });
 
+  describe('clipboard operations', () => {
+    it('should return copy result for :copy', () => {
+      const cmd = parseCommand('copy');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'copy' });
+    });
+
+    it('should return copy result for :y (vim yank alias)', () => {
+      const cmd = parseCommand('y');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'copy' });
+    });
+
+    it('should return cut result for :cut', () => {
+      const cmd = parseCommand('cut');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'cut' });
+    });
+
+    it('should return cut result for :x (vim cut alias)', () => {
+      const cmd = parseCommand('x');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'cut' });
+    });
+
+    it('should return paste result for :paste', () => {
+      const cmd = parseCommand('paste');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'paste' });
+    });
+
+    it('should return delete result for :delete', () => {
+      const cmd = parseCommand('delete');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'delete' });
+    });
+
+    it('should return delete result for :d (vim delete alias)', () => {
+      const cmd = parseCommand('d');
+      const result = executeCommand(cmd);
+      expect(result).toEqual({ type: 'delete' });
+    });
+  });
+
   describe('unknown commands', () => {
     it('should return error for unknown commands', () => {
       const cmd = parseCommand('unknowncommand');
