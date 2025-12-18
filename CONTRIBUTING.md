@@ -15,7 +15,7 @@ Before contributing, please understand Memoir's core principles:
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20+
 - pnpm
 
 ### Getting Started

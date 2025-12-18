@@ -4,6 +4,9 @@
   "type": "module",
   "private": true,
   "description": "Minimal TUI notes app for experiments & thinking",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "bin": {
     "memoir": "./dist/index.js",
     "mem": "./dist/index.js"
