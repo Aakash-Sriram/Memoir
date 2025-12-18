@@ -46,14 +46,20 @@ src/
 ├── app.tsx            # Main React component, state management
 ├── types.ts           # TypeScript types and interfaces
 ├── components/
+│   ├── AutocompleteList.tsx  # Command autocomplete dropdown
 │   ├── Editor.tsx     # Text editor display
-│   ├── StatusBar.tsx  # Mode and command display
-│   └── SearchResults.tsx  # Search results view
+│   ├── SearchResults.tsx  # Search results view
+│   └── StatusBar.tsx  # Mode and command display
 ├── hooks/
 │   └── useKeyboard.ts # Keyboard input handling
 └── lib/
+    ├── autocomplete.ts    # Command/argument autocomplete logic
+    ├── autocomplete.test.ts
+    ├── clipboard.ts   # System clipboard with fallback
     ├── commands.ts    # Command parsing and execution
+    ├── commands.test.ts
     ├── dates.ts       # Date utilities (date-fns)
+    ├── dates.test.ts
     └── storage.ts     # File I/O operations
 ```
 
@@ -107,17 +113,36 @@ refactor: simplify keyboard handling logic
 
 ## Testing
 
-Currently, Memoir relies on manual testing:
+Memoir has automated tests using Vitest:
 
 ```bash
-# Run the app
-pnpm dev
+# Run all tests
+pnpm test
+
+# Run tests in watch mode
+pnpm test -- --watch
+```
+
+Manual testing is also recommended:
+
+```bash
+# Build and run the app
+pnpm build
+node dist/index.js
 
 # Test commands
 :next, :prev, :today
+:goto <heading>          # Tab for autocomplete
 :search <query>
+:copy, :cut, :paste, :delete
 :write, :quit
 ```
+
+### Pull Request Checklist
+
+1. Run `pnpm test` - all tests should pass
+2. Run `pnpm build` - should compile without errors
+3. Manually test any new features
 
 ## Questions?
 
