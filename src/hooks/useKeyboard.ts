@@ -22,7 +22,8 @@ interface KeyHandlers {
   // Mode switching (only two modes!)
   onEnterInsertMode: () => void;
   onEnterInsertModeAppend: () => void;
-  onEnterInsertModeNewLine: () => void;
+  onEnterInsertModeNewLineBelow: () => void;
+  onEnterInsertModeNewLineAbove: () => void;
   onExitInsertMode: () => void;
   
   // Command input (not a mode!)
@@ -31,6 +32,13 @@ interface KeyHandlers {
   onCommandBackspace: () => void;
   onExecuteCommand: () => void;
   onCancelCommand: () => void;
+  
+  // Autocomplete (temporary overlay, not a mode)
+  onAutocomplete: () => void;
+  onAutocompleteUp: () => void;
+  onAutocompleteDown: () => void;
+  onAutocompleteSelect: () => void;
+  onAutocompleteCancel: () => void;
   
   // Results navigation (a view, not a mode)
   onSelectResult: () => void;
@@ -53,10 +61,11 @@ interface KeyboardState {
   mode: AppMode;
   view: ViewType;
   commandActive: boolean;
+  autocompleteActive: boolean;
 }
 
 export function useKeyboard(state: KeyboardState, handlers: KeyHandlers) {
-  const { mode, view, commandActive } = state;
+  const { mode, view, commandActive, autocompleteActive } = state;
   
   useInput((input: string, key: Key) => {
     // Global: Ctrl+C always quits
@@ -73,7 +82,7 @@ export function useKeyboard(state: KeyboardState, handlers: KeyHandlers) {
     
     // Command input active (not a mode, just a UI state)
     if (commandActive) {
-      handleCommandInput(input, key, handlers);
+      handleCommandInput(input, key, handlers, autocompleteActive);
       return;
     }
     
@@ -148,7 +157,11 @@ function handleNormalMode(input: string, key: Key, handlers: KeyHandlers) {
     return;
   }
   if (input === 'o') {
-    handlers.onEnterInsertModeNewLine();
+    handlers.onEnterInsertModeNewLineBelow();
+    return;
+  }
+  if (input === 'O') {
+    handlers.onEnterInsertModeNewLineAbove();
     return;
   }
   
@@ -216,7 +229,29 @@ function handleInsertMode(input: string, key: Key, handlers: KeyHandlers) {
   }
 }
 
-function handleCommandInput(input: string, key: Key, handlers: KeyHandlers) {
+function handleCommandInput(input: string, key: Key, handlers: KeyHandlers, autocompleteActive: boolean) {
+  // When autocomplete is active, handle navigation
+  if (autocompleteActive) {
+    if (key.escape) {
+      handlers.onAutocompleteCancel();
+      return;
+    }
+    if (key.return) {
+      handlers.onAutocompleteSelect();
+      return;
+    }
+    if (input === 'j' || key.downArrow) {
+      handlers.onAutocompleteDown();
+      return;
+    }
+    if (input === 'k' || key.upArrow) {
+      handlers.onAutocompleteUp();
+      return;
+    }
+    // Any other key cancels autocomplete and falls through
+    handlers.onAutocompleteCancel();
+  }
+  
   // Escape cancels command
   if (key.escape) {
     handlers.onCancelCommand();
@@ -226,6 +261,12 @@ function handleCommandInput(input: string, key: Key, handlers: KeyHandlers) {
   // Enter executes command
   if (key.return) {
     handlers.onExecuteCommand();
+    return;
+  }
+  
+  // Tab triggers autocomplete
+  if (key.tab) {
+    handlers.onAutocomplete();
     return;
   }
   

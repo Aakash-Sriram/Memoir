@@ -38,6 +38,16 @@ export interface CommandState {
   hint?: string;         // Subtle hint shown in status bar
 }
 
+// Autocomplete types (defined here to avoid circular imports)
+export type AutocompleteType = 'command' | 'argument';
+
+export interface AutocompleteState {
+  active: boolean;
+  candidates: string[];
+  selectedIndex: number;
+  type: AutocompleteType;
+}
+
 export interface AppState {
   // Core state
   mode: AppMode;
@@ -48,6 +58,9 @@ export interface AppState {
   
   // Command state (not a mode!)
   command: CommandState;
+  
+  // Autocomplete state (temporary overlay, not a mode)
+  autocomplete: AutocompleteState;
   
   // Search results (view, not mode)
   searchQuery: string;

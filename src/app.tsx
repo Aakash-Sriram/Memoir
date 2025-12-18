@@ -1,4 +1,4 @@
-// Labbook - Minimal TUI Notes App
+// Memoir - Minimal TUI Notes App
 //
 // Design contract:
 // - Only two modes: Normal and Insert
@@ -7,13 +7,15 @@
 
 import React, { useState, useCallback } from 'react';
 import { Box, Text, useApp, useStdout } from 'ink';
-import { AppState, ViewType } from './types.js';
+import { AppState, ViewType, AutocompleteState } from './types.js';
 import { loadNote, saveNote, searchNotes } from './lib/storage.js';
 import { getToday, getYesterday, getTomorrow, parseDate } from './lib/dates.js';
 import { parseCommand, executeCommand } from './lib/commands.js';
+import { autocompleteCommand, getInitialAutocompleteState, createAutocompleteState, navigateAutocomplete, getSelectedCandidate, COMMANDS_WITH_ARGS } from './lib/autocomplete.js';
 import { StatusBar } from './components/StatusBar.js';
 import { Editor } from './components/Editor.js';
 import { SearchResults } from './components/SearchResults.js';
+import { AutocompleteList } from './components/AutocompleteList.js';
 import { useKeyboard } from './hooks/useKeyboard.js';
 
 // Initialize state for a given date
@@ -37,6 +39,7 @@ function initState(date: string): AppState {
       input: '',
       hint: undefined
     },
+    autocomplete: getInitialAutocompleteState(),
     searchQuery: '',
     searchResults: [],
     selectedResultIndex: 0,
@@ -251,10 +254,14 @@ export default function App() {
       updateCursor(state.editor.cursorLine, state.editor.cursorCol + 1);
       setState(prev => ({ ...prev, mode: 'insert', message: '' }));
     },
-    onEnterInsertModeNewLine: () => {
+    onEnterInsertModeNewLineBelow: () => {
       setState(prev => {
+        const currentLine = prev.editor.lines[prev.editor.cursorLine] || '';
+        const indentMatch = currentLine.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1] : '';
+        
         const newLines = [...prev.editor.lines];
-        newLines.splice(prev.editor.cursorLine + 1, 0, '');
+        newLines.splice(prev.editor.cursorLine + 1, 0, indent);
         return {
           ...prev,
           mode: 'insert',
@@ -263,7 +270,28 @@ export default function App() {
             ...prev.editor,
             lines: newLines,
             cursorLine: prev.editor.cursorLine + 1,
-            cursorCol: 0
+            cursorCol: indent.length
+          },
+          message: ''
+        };
+      });
+    },
+    onEnterInsertModeNewLineAbove: () => {
+      setState(prev => {
+        const currentLine = prev.editor.lines[prev.editor.cursorLine] || '';
+        const indentMatch = currentLine.match(/^(\s*)/);
+        const indent = indentMatch ? indentMatch[1] : '';
+        
+        const newLines = [...prev.editor.lines];
+        newLines.splice(prev.editor.cursorLine, 0, indent);
+        return {
+          ...prev,
+          mode: 'insert',
+          dirty: true,
+          editor: {
+            ...prev.editor,
+            lines: newLines,
+            cursorCol: indent.length
           },
           message: ''
         };
@@ -286,7 +314,61 @@ export default function App() {
     onExecuteCommand: () => runCommand(state.command.input),
     onCancelCommand: () => setState(prev => ({ 
       ...prev, 
-      command: { active: false, input: '', hint: undefined } 
+      command: { active: false, input: '', hint: undefined },
+      autocomplete: getInitialAutocompleteState()
+    })),
+    
+    // Autocomplete handlers
+    onAutocomplete: () => {
+      const result = autocompleteCommand(state.command.input, { lines: state.editor.lines });
+      if (result.completion) {
+        // Single match: inline completion
+        setState(prev => ({
+          ...prev,
+          command: { ...prev.command, input: result.completion! }
+        }));
+      } else if (result.candidates && result.candidates.length > 0) {
+        // Multiple matches: show list
+        setState(prev => ({
+          ...prev,
+          autocomplete: createAutocompleteState(result.candidates!, result.type || 'command')
+        }));
+      }
+    },
+    onAutocompleteUp: () => setState(prev => ({
+      ...prev,
+      autocomplete: navigateAutocomplete(prev.autocomplete, 'up')
+    })),
+    onAutocompleteDown: () => setState(prev => ({
+      ...prev,
+      autocomplete: navigateAutocomplete(prev.autocomplete, 'down')
+    })),
+    onAutocompleteSelect: () => {
+      const selected = getSelectedCandidate(state.autocomplete);
+      if (!selected) return;
+      
+      if (state.autocomplete.type === 'argument') {
+        // For argument completion, replace just the argument part
+        const spaceIndex = state.command.input.indexOf(' ');
+        const commandPart = state.command.input.slice(0, spaceIndex + 1);
+        setState(prev => ({
+          ...prev,
+          command: { ...prev.command, input: commandPart + selected },
+          autocomplete: getInitialAutocompleteState()
+        }));
+      } else {
+        // For command completion
+        const needsSpace = COMMANDS_WITH_ARGS.has(selected);
+        setState(prev => ({
+          ...prev,
+          command: { ...prev.command, input: needsSpace ? selected + ' ' : selected },
+          autocomplete: getInitialAutocompleteState()
+        }));
+      }
+    },
+    onAutocompleteCancel: () => setState(prev => ({
+      ...prev,
+      autocomplete: getInitialAutocompleteState()
     })),
     
     onSelectResult: () => {
@@ -402,7 +484,8 @@ export default function App() {
   useKeyboard({
     mode: state.mode,
     view: state.view,
-    commandActive: state.command.active
+    commandActive: state.command.active,
+    autocompleteActive: state.autocomplete.active
   }, handlers);
   
   const reservedLines = state.command.active ? 5 : 4;
@@ -410,7 +493,7 @@ export default function App() {
   return (
     <Box flexDirection="column" height={terminalHeight}>
       <Box marginBottom={1}>
-        <Text bold color="cyan">labbook</Text>
+        <Text bold color="cyan">memoir</Text>
         <Text dimColor> — your lab notebook</Text>
       </Box>
       
@@ -434,10 +517,18 @@ export default function App() {
       </Box>
       
       {state.command.active && (
-        <Box>
-          <Text bold>:</Text>
-          <Text>{state.command.input}</Text>
-          <Text backgroundColor="white" color="black"> </Text>
+        <Box flexDirection="column">
+          <Box>
+            <Text bold>:</Text>
+            <Text>{state.command.input}</Text>
+            <Text backgroundColor="white" color="black"> </Text>
+          </Box>
+          {state.autocomplete.active && (
+            <AutocompleteList
+              candidates={state.autocomplete.candidates}
+              selectedIndex={state.autocomplete.selectedIndex}
+            />
+          )}
         </Box>
       )}
       
