@@ -92,15 +92,23 @@ interface StyledLineProps {
 }
 
 function StyledLine({ line, isCurrentLine }: StyledLineProps) {
-  // Apply markdown-like styling
+  // Apply markdown-like styling with cursor visibility for current line
+  const bgColor = isCurrentLine ? 'gray' : undefined;
+  
   if (line.startsWith('# ')) {
-    return <Text bold color="cyan">{line}</Text>;
+    return <Text bold color="cyan" backgroundColor={bgColor}>{line || ' '}</Text>;
   }
   if (line.startsWith('## ')) {
-    return <Text bold color="blue">{line}</Text>;
+    return <Text bold color="blue" backgroundColor={bgColor}>{line || ' '}</Text>;
   }
   if (line.startsWith('### ')) {
-    return <Text bold color="magenta">{line}</Text>;
+    return <Text bold color="magenta" backgroundColor={bgColor}>{line || ' '}</Text>;
+  }
+  if (line.startsWith('#### ')) {
+    return <Text bold color="yellow" backgroundColor={bgColor}>{line || ' '}</Text>;
+  }
+  if (line.startsWith('##### ') || line.startsWith('###### ')) {
+    return <Text bold color="green" backgroundColor={bgColor}>{line || ' '}</Text>;
   }
   
   // Highlight current line in normal mode
