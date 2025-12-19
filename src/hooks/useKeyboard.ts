@@ -316,3 +316,6 @@ function handleResultsView(input: string, key: Key, handlers: KeyHandlers) {
   }
 }
 
+// Export internal handlers for unit testing
+export { handleNormalMode, handleInsertMode, handleCommandInput, handleResultsView };
+

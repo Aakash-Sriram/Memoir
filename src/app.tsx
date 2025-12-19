@@ -20,7 +20,7 @@ import { AutocompleteList } from './components/AutocompleteList.js';
 import { useKeyboard } from './hooks/useKeyboard.js';
 
 // Initialize state for a given date
-function initState(date: string): AppState {
+export function initState(date: string): AppState {
   const note = loadNote(date);
   const lines = note.content.split('\n');
   
