@@ -49,6 +49,7 @@ export function Editor({
               <StyledLine 
                 line={line} 
                 isCurrentLine={isCurrentLine && mode === 'normal'}
+                cursorCol={cursorCol}
               />
             )}
           </Box>
@@ -74,13 +75,13 @@ interface EditableLineProps {
 
 function EditableLine({ line, cursorCol }: EditableLineProps) {
   const beforeCursor = line.slice(0, cursorCol);
-  const atCursor = line[cursorCol] ?? ' ';
-  const afterCursor = line.slice(cursorCol + 1);
-  
+  const afterCursor = line.slice(cursorCol);
+
+  // Insert mode: show a thin caret (pipe) between characters
   return (
     <Text>
       {beforeCursor}
-      <Text backgroundColor="white" color="black">{atCursor}</Text>
+      <Text color="white" backgroundColor="black">|</Text>
       {afterCursor}
     </Text>
   );
@@ -89,32 +90,97 @@ function EditableLine({ line, cursorCol }: EditableLineProps) {
 interface StyledLineProps {
   line: string;
   isCurrentLine: boolean;
+  cursorCol?: number;
 }
 
-function StyledLine({ line, isCurrentLine }: StyledLineProps) {
-  // Apply markdown-like styling with cursor visibility for current line
-  const bgColor = isCurrentLine ? 'gray' : undefined;
-  
+function StyledLine({ line, isCurrentLine, cursorCol }: StyledLineProps) {
+  // If current line in Normal mode and cursorCol is provided, split into before/at/after for block caret rendering
+  if (isCurrentLine && typeof cursorCol === 'number') {
+    const cursor = cursorCol ?? 0;
+    const before = line.slice(0, cursorCol);
+    const at = line[cursor] ?? ' ';
+    const after = line.slice(cursor + 1);
+
+    const renderWithStyle = (content: string, style: { bold?: boolean; color?: string } = {}) => {
+      const { bold, color } = style;
+      return (
+        <Text bold={!!bold} color={color}>{content || ' '}</Text>
+      );
+    };
+
+    // Determine heading style
+    if (line.startsWith('# ')) {
+      return (
+        <Text>
+          {renderWithStyle(before, { bold: true, color: 'cyan' })}
+          <Text backgroundColor="white" color="black">{at}</Text>
+          {renderWithStyle(after, { bold: true, color: 'cyan' })}
+        </Text>
+      );
+    }
+    if (line.startsWith('## ')) {
+      return (
+        <Text>
+          <Text bold color="blue">{before}</Text>
+          <Text backgroundColor="white" color="black">{at}</Text>
+          <Text bold color="blue">{after}</Text>
+        </Text>
+      );
+    }
+    if (line.startsWith('### ')) {
+      return (
+        <Text>
+          <Text bold color="magenta">{before}</Text>
+          <Text backgroundColor="white" color="black">{at}</Text>
+          <Text bold color="magenta">{after}</Text>
+        </Text>
+      );
+    }
+    if (line.startsWith('#### ')) {
+      return (
+        <Text>
+          <Text bold color="yellow">{before}</Text>
+          <Text backgroundColor="white" color="black">{at}</Text>
+          <Text bold color="yellow">{after}</Text>
+        </Text>
+      );
+    }
+    if (line.startsWith('##### ') || line.startsWith('###### ')) {
+      return (
+        <Text>
+          <Text bold color="green">{before}</Text>
+          <Text backgroundColor="white" color="black">{at}</Text>
+          <Text bold color="green">{after}</Text>
+        </Text>
+      );
+    }
+
+    // Default (non-heading) current line
+    return (
+      <Text>
+        {before}
+        <Text backgroundColor="white" color="black">{at}</Text>
+        {after}
+      </Text>
+    );
+  }
+
+  // Non-current or non-normal-mode rendering (plain)
   if (line.startsWith('# ')) {
-    return <Text bold color="cyan" backgroundColor={bgColor}>{line || ' '}</Text>;
+    return <Text bold color="cyan">{line || ' '}</Text>;
   }
   if (line.startsWith('## ')) {
-    return <Text bold color="blue" backgroundColor={bgColor}>{line || ' '}</Text>;
+    return <Text bold color="blue">{line || ' '}</Text>;
   }
   if (line.startsWith('### ')) {
-    return <Text bold color="magenta" backgroundColor={bgColor}>{line || ' '}</Text>;
+    return <Text bold color="magenta">{line || ' '}</Text>;
   }
   if (line.startsWith('#### ')) {
-    return <Text bold color="yellow" backgroundColor={bgColor}>{line || ' '}</Text>;
+    return <Text bold color="yellow">{line || ' '}</Text>;
   }
   if (line.startsWith('##### ') || line.startsWith('###### ')) {
-    return <Text bold color="green" backgroundColor={bgColor}>{line || ' '}</Text>;
+    return <Text bold color="green">{line || ' '}</Text>;
   }
-  
-  // Highlight current line in normal mode
-  if (isCurrentLine) {
-    return <Text backgroundColor="gray">{line || ' '}</Text>;
-  }
-  
+
   return <Text>{line}</Text>;
 }

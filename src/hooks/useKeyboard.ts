@@ -80,6 +80,17 @@ export function useKeyboard(state: KeyboardState, handlers: KeyHandlers) {
       return;
     }
     
+    // Global: Ctrl+H / Ctrl+L act as quickPrev / quickNext (note navigation)
+    // Only active in Normal mode (do not trigger while editing commands or in Insert mode)
+    if (input === 'h' && key.ctrl && mode === 'normal' && !commandActive) {
+      handlers.onQuickPrev();
+      return;
+    }
+    if (input === 'l' && key.ctrl && mode === 'normal' && !commandActive) {
+      handlers.onQuickNext();
+      return;
+    }
+    
     // Command input active (not a mode, just a UI state)
     if (commandActive) {
       handleCommandInput(input, key, handlers, autocompleteActive);
@@ -113,21 +124,13 @@ function handleNormalMode(input: string, key: Key, handlers: KeyHandlers) {
     return;
   }
   
-  // Cursor navigation
-  if (input === 'j' || key.downArrow) {
+  // Cursor navigation (Vim-like keys only in Normal mode)
+  if (input === 'j') {
     handlers.onNavigateDown();
     return;
   }
-  if (input === 'k' || key.upArrow) {
+  if (input === 'k') {
     handlers.onNavigateUp();
-    return;
-  }
-  if (key.leftArrow) {
-    handlers.onNavigateLeft();
-    return;
-  }
-  if (key.rightArrow) {
-    handlers.onNavigateRight();
     return;
   }
   if (input === '0') {
@@ -170,12 +173,13 @@ function handleNormalMode(input: string, key: Key, handlers: KeyHandlers) {
     handlers.onQuickSearch();
     return;
   }
+  // Vim-like horizontal movement: h -> left, l -> right
   if (input === 'h') {
-    handlers.onQuickPrev();
+    handlers.onNavigateLeft();
     return;
   }
   if (input === 'l') {
-    handlers.onQuickNext();
+    handlers.onNavigateRight();
     return;
   }
 }

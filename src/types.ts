@@ -29,6 +29,8 @@ export interface EditorState {
   cursorCol: number;
   scrollOffset: number;
   lines: string[];
+  // Preferred column for vertical motions (like Vim's 'preferred column')
+  preferredCol?: number;
 }
 
 // Command system

@@ -32,6 +32,7 @@ function initState(date: string): AppState {
     editor: {
       cursorLine: 0,
       cursorCol: 0,
+        preferredCol: 0,
       scrollOffset: 0,
       lines
     },
@@ -120,6 +121,7 @@ export default function App() {
           ...prev.editor,
           cursorLine: lineIndex,
           cursorCol: 0,
+          preferredCol: 0,
           scrollOffset: Math.max(0, lineIndex - 3)
         },
         message: ''
@@ -208,7 +210,8 @@ export default function App() {
               ...prev.editor,
               lines: newLines,
               cursorLine: newCursorLine,
-              cursorCol: newCursorCol
+              cursorCol: newCursorCol,
+              preferredCol: newCursorCol
             },
             message: 'Cut line'
           };
@@ -234,7 +237,8 @@ export default function App() {
               ...prev.editor,
               lines: newLines,
               cursorLine: newCursorLine,
-              cursorCol: newCursorCol
+              cursorCol: newCursorCol,
+              preferredCol: newCursorCol
             },
             message: 'Deleted line'
           };
@@ -261,7 +265,8 @@ export default function App() {
               ...prev.editor,
               lines: newLines,
               cursorLine: cursorLine + 1,
-              cursorCol: 0
+              cursorCol: 0,
+              preferredCol: 0
             },
             message: 'Pasted'
           };
@@ -289,22 +294,36 @@ export default function App() {
       const maxLine = prev.editor.lines.length - 1;
       const newLine = Math.max(0, Math.min(line, maxLine));
       const lineContent = prev.editor.lines[newLine] ?? '';
-      const maxCol = Math.max(0, lineContent.length - (prev.mode === 'normal' ? 1 : 0));
-      const newCol = Math.max(0, Math.min(col, maxCol));
-      
+
+      // Determine desired column. If moving vertically (line changed), prefer remembered column.
+      const wasLine = prev.editor.cursorLine;
+      const remembered = typeof prev.editor.preferredCol === 'number' ? prev.editor.preferredCol : prev.editor.cursorCol;
+
+      let desiredCol: number;
+      if (newLine !== wasLine) {
+        desiredCol = remembered;
+      } else if (col === Infinity) {
+        desiredCol = lineContent.length;
+      } else {
+        desiredCol = col;
+      }
+
+      const newCol = Math.max(0, Math.min(desiredCol, lineContent.length));
+
       let newScroll = prev.editor.scrollOffset;
       if (newLine < newScroll) {
         newScroll = newLine;
       } else if (newLine >= newScroll + editorHeight) {
         newScroll = newLine - editorHeight + 1;
       }
-      
+
       return {
         ...prev,
         editor: {
           ...prev.editor,
           cursorLine: newLine,
           cursorCol: newCol,
+          preferredCol: newCol,
           scrollOffset: newScroll
         }
       };
@@ -361,7 +380,8 @@ export default function App() {
             ...prev.editor,
             lines: newLines,
             cursorLine: prev.editor.cursorLine + 1,
-            cursorCol: indent.length
+            cursorCol: indent.length,
+            preferredCol: indent.length
           },
           message: ''
         };
@@ -382,7 +402,8 @@ export default function App() {
           editor: {
             ...prev.editor,
             lines: newLines,
-            cursorCol: indent.length
+            cursorCol: indent.length,
+            preferredCol: indent.length
           },
           message: ''
         };
@@ -492,7 +513,8 @@ export default function App() {
           editor: {
             ...prev.editor,
             lines,
-            cursorCol: cursorCol + char.length
+            cursorCol: cursorCol + char.length,
+            preferredCol: cursorCol + char.length
           }
         };
       });
@@ -511,7 +533,8 @@ export default function App() {
             editor: {
               ...prev.editor,
               lines,
-              cursorCol: cursorCol - 1
+              cursorCol: cursorCol - 1,
+              preferredCol: cursorCol - 1
             }
           };
         } else if (cursorLine > 0) {
@@ -526,7 +549,8 @@ export default function App() {
               ...prev.editor,
               lines,
               cursorLine: cursorLine - 1,
-              cursorCol: prevLine.length
+              cursorCol: prevLine.length,
+              preferredCol: prevLine.length
             }
           };
         }
@@ -551,7 +575,8 @@ export default function App() {
             ...prev.editor,
             lines,
             cursorLine: cursorLine + 1,
-            cursorCol: 0
+            cursorCol: 0,
+            preferredCol: 0
           }
         };
       });
