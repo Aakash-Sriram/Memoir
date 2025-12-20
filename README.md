@@ -1,4 +1,4 @@
-# Memoir
+# Cli based Notes app 
 
 A minimal terminal-first notes app for experiments & thinking.
 
